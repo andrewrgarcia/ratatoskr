@@ -1,7 +1,8 @@
 fur/
 SHOW.*
 
+# RATATOSKR-native
+trace/
 
 # Added by cargo
-
 /target
