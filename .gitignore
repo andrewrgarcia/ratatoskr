@@ -1,2 +1,7 @@
 fur/
 SHOW.*
+
+
+# Added by cargo
+
+/target
