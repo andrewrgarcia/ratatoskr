@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/ratatoskr.jpg" width="200" alt="fur logo"/>
+  <img src="img/ratatoskr.png" width="200" alt="fur logo"/>
 </p>
 
 <h1 align="center">RATATOSKR</h1>
