@@ -1,0 +1,8 @@
+task_type: chat
+prompt: "Hello Ratatoskr"
+memory_scope: project
+engine:
+  type: local
+  name: ollama
+  model: mistral
+
