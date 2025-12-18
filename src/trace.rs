@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use crate::task::{Task, MemoryRef};
+use crate::task::Task;
 
 pub const RATATOSKR_VERSION: &str = "0.2.0-dev";
 
@@ -198,17 +198,6 @@ fn write_selection(
     Ok(())
 }
 
-pub fn write_memory_refs(
-    trace_dir: &PathBuf,
-    refs: &Vec<MemoryRef>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = trace_dir
-        .join("resolved_context")
-        .join("memory_refs.yaml");
-
-    fs::write(path, serde_yaml::to_string(refs)?)?;
-    Ok(())
-}
 
 /* ================================
    Utilities

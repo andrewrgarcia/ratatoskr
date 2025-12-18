@@ -1,18 +1,14 @@
 task_type: chat
-prompt: "Summarize inflation outlook"
+prompt: "Summarize the inflation outlook based on the provided material."
 memory_scope: project
 
 memory_refs:
   - system: fur
-    id: "fur://session/2025-12-10/17"
-  - system: fur
-    id: "fur://project/bank/monetary-policy"
+    convo_id: 4c0949c0-b52b-4a89-98a8-10d59cc117d4
 
-context:
-  - path: notes/inflation_note.md
-    lines: [12, 45]
+context: []
 
 engine:
   type: local
-  name: ollama
-  model: mistral
+  name: stub
+  model: none

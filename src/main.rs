@@ -1,6 +1,7 @@
 mod engine;
 mod task;
 mod trace;
+mod fur_atom;
 
 use std::path::Path;
 
@@ -13,9 +14,9 @@ use crate::trace::{
     resolve_context,
     update_trace_status,
     write_file,
-    write_memory_refs,
     TraceStatus,
 };
+use crate::fur_atom::{load_fur_thread, FurAtom};
 
 fn main() {
     if let Err(e) = run() {
@@ -25,7 +26,10 @@ fn main() {
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let task = load_task()?;
+    // ----------------------------
+    // LOAD + FREEZE INTENT
+    // ----------------------------
+    let task = load_task()?; // immutable intent
 
     let trace_root = Path::new("trace");
     ensure_dir(trace_root)?;
@@ -40,46 +44,93 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     ensure_dir(&trace_dir)?;
     initialize_trace_layout(&trace_dir, &trace_id)?;
 
-    // Freeze intent
-    let task_yaml = serde_yaml::to_string(&task)?;
-    write_file(&trace_dir, "input.yaml", &task_yaml)?;
+    write_file(
+        &trace_dir,
+        "input.yaml",
+        &serde_yaml::to_string(&task)?,
+    )?;
 
-    // ---- PROMPT ASSEMBLY ----
-    let mut prompt = assemble_prompt(&task);
+    // ----------------------------
+    // RESOLVE FUR → ATOMS
+    // ----------------------------
+    let mut atoms: Vec<FurAtom> = Vec::new();
 
+    for mem in &task.memory_refs {
+        if mem.system != "fur" {
+            return Err("unsupported memory system".into());
+        }
+
+        let fur_dir = Path::new(".fur");
+        let mut convo_atoms = load_fur_thread(fur_dir, &mem.convo_id)?;
+        atoms.append(&mut convo_atoms);
+    }
+
+    // Persist full material ledger (THIS IS THE POINT)
+    write_file(
+        &trace_dir,
+        "materials.yaml",
+        &serde_yaml::to_string(&atoms)?,
+    )?;
+
+    // ----------------------------
+    // PROMPT ASSEMBLY (DETERMINISTIC)
+    // ----------------------------
+    let mut prompt = String::new();
+
+    prompt.push_str(
+        "SYSTEM:\n\
+         You may ONLY use the following material atoms.\n\
+         Cite atoms as [FUR:<message_id>].\n\n",
+    );
+
+    for atom in &atoms {
+        prompt.push_str(&format!(
+            "=== ATOM FUR:{}:{} ===\n{}\n\n",
+            atom.message_id,
+            atom.sha256,
+            atom.content
+        ));
+    }
+
+    prompt.push_str("\n=== TASK ===\n");
+    prompt.push_str(&assemble_prompt(&task));
+
+    // Optional filesystem context (non-FUR)
     let context_chunks = resolve_context(&task, &trace_dir)?;
     for chunk in context_chunks {
         prompt.push_str("\n\n--- CONTEXT ---\n");
         prompt.push_str(&chunk);
     }
 
-    write_memory_refs(&trace_dir, &task.memory_refs)?;
-
     write_file(&trace_dir, "prompt.txt", &prompt)?;
 
-    // ---- ENGINE INVOCATION ----
+    // ----------------------------
+    // ENGINE EXECUTION
+    // ----------------------------
     let engine = StubEngine {};
     let response = engine.run(&prompt)?;
 
     write_file(&trace_dir, "response.txt", &response)?;
     write_file(&trace_dir, "engine.yaml", &engine.describe())?;
 
-    // ---- FINALIZE TRACE ----
+    // ----------------------------
+    // FINALIZE TRACE
+    // ----------------------------
     update_trace_status(&trace_dir, TraceStatus::Executed)?;
-
     println!("Trace executed: {}", trace_id);
+
     Ok(())
 }
 
-
-
 /* ================================
-   Prompt assembly (deterministic)
+   Prompt assembly (task-only)
    ================================ */
 
 fn assemble_prompt(task: &Task) -> String {
     format!(
         "TASK TYPE: {}\nMEMORY SCOPE: {}\n\n{}",
-        task.task_type, task.memory_scope, task.prompt
+        task.task_type,
+        task.memory_scope,
+        task.prompt
     )
 }

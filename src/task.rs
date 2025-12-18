@@ -34,11 +34,20 @@ pub struct ContextRef {
     pub section: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MemoryRef {
-    pub system: String,
-    pub id: String,
+    pub system: String,      // "fur"
+    pub convo_id: String,    // FUR thread id
 }
+
+#[derive(Debug, Serialize)]
+pub struct LockedMemoryRef {
+    pub system: String,
+    pub convo_id: String,
+    pub export: String,
+    pub sha256: String,
+}
+
 
 /* ================================
    Loading
