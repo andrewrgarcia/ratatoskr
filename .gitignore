@@ -3,6 +3,8 @@ SHOW.*
 
 # RATATOSKR-native
 trace/
+codex/
+notes/ 
 
 # Added by cargo
 /target
