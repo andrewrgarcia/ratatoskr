@@ -22,3 +22,4 @@ If something changed, RATATOSKR records it.
 If it is not visible on disk, it did not happen.
 
 RATATOSKR is infrastructure, not an assistant.
+
