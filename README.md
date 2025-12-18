@@ -5,7 +5,7 @@
 <h1 align="center">RATATOSKR</h1>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/status-v0.2.0--core-blue" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/status-v0.3.0--enforced-blue" /></a>
   <a href="#"><img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue" /></a>
   <a href="#"><img src="https://img.shields.io/badge/execution-local--first-green" /></a>
   <a href="#"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" /></a>
@@ -29,6 +29,8 @@ It does **not** attempt to be intelligent.
 
 Instead, RATATOSKR **refuses to execute** unless *all* inputs, context, memory references,
 engine configuration, and outputs are made **explicit, persisted, and inspectable**.
+
+**If a model produces an output without explicitly citing the material it used, execution fails.**
 
 Language models are treated as **replaceable engines**.  
 Memory and context live **outside the model**.  
@@ -63,10 +65,10 @@ Its purpose is to **enforce execution semantics**.
 Where most RAG pipelines treat provenance as optional,
 RATATOSKR makes provenance **mandatory**.
 
-RATATOSKR does not ask:
+RATATOSKR does not ask:  
 > “What information should we retrieve?”
 
-It asks:
+It asks:  
 > “What information *actually* influenced this result — and where is the proof?”
 
 ---
@@ -81,6 +83,7 @@ Each execution creates a **trace directory** containing:
 - explicit memory references
 - engine declaration
 - raw model output
+- a material usage ledger proving which inputs were actually used
 - trace metadata and lifecycle state
 
 These artifacts are append-only, durable, and replayable.
@@ -95,16 +98,17 @@ RATATOSKR is designed to work **in concert**, not competition, with:
 - **Yggdrasil-CLI** — project and codebase flattening
 - downstream engines (local or remote) treated as pure executors
 
-RATATOSKR defines *execution truth*.
+RATATOSKR defines *execution truth*.  
 Other systems may consume it.
 
 ---
 
 ## Project Status
 
-- **v0.2.0** — Core execution contract frozen
-- Trace format stabilized
-- Module boundaries established
+- **v0.3.0** — Citation-enforced execution
+- Message-level material atoms
+- Mandatory post-inference validation
+- Material usage ledger (auditable grounding)
 - Engine abstraction intentionally minimal
 
 Future versions will extend capability **without breaking the execution contract**.
@@ -132,5 +136,5 @@ Licensed under the Apache License, Version 2.0.
 ---
 
 <p align="center">
-  RATATOSKR is the paper trail your language model cannot erase.
+  <strong>RATATOSKR is the paper trail your language model cannot escape.</strong>
 </p>

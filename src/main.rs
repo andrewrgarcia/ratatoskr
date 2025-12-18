@@ -2,6 +2,8 @@ mod engine;
 mod task;
 mod trace;
 mod fur_atom;
+mod citation;
+mod validate;
 
 use std::path::Path;
 
@@ -17,8 +19,6 @@ use crate::trace::{
     TraceStatus,
 };
 use crate::fur_atom::{load_fur_thread, FurAtom};
-use regex::Regex;
-use std::collections::HashSet;
 
 fn main() {
     if let Err(e) = run() {
@@ -110,35 +110,33 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // ENGINE EXECUTION
     // ----------------------------
     let engine = StubEngine {};
+
+    use crate::citation::extract_fur_citations;
+    use crate::validate::validate_citations;
+
     let response = engine.run(&prompt)?;
 
+    // ---- ENFORCEMENT PASS ----
+    let citations = extract_fur_citations(&response);
+
+    if let Err(e) = validate_citations(&citations, &atoms) {
+        write_file(&trace_dir, "response.txt", &response)?;
+        write_file(&trace_dir, "violation.txt", &e)?;
+        update_trace_status(&trace_dir, TraceStatus::Failed)?;
+        return Err(e.into());
+    }
+
+    // --------------------------
     write_file(&trace_dir, "response.txt", &response)?;
     write_file(&trace_dir, "engine.yaml", &engine.describe())?;
 
-    // ----------------------------
-    // POST-INFERENCE VALIDATION
-    // ----------------------------
-    let cited = extract_citations(&response);
-
-    if cited.is_empty() {
-        return Err("model produced no material citations".into());
-    }
-
-    let known: HashSet<&str> =
-        atoms.iter().map(|a| a.message_id.as_str()).collect();
-
-    for cid in &cited {
-        if !known.contains(cid.as_str()) {
-            return Err(format!("invalid citation: {}", cid).into());
-        }
-    }
 
     // ----------------------------
     // MATERIAL USAGE LEDGER
     // ----------------------------
     let used: Vec<UsedAtom> = atoms
         .iter()
-        .filter(|a| cited.contains(&a.message_id))
+        .filter(|a| citations.contains(&a.message_id))
         .map(|a| UsedAtom {
             convo_id: &a.convo_id,
             message_id: &a.message_id,
@@ -178,19 +176,6 @@ fn assemble_prompt(task: &Task) -> String {
 /* ================================
    Citation extraction & validation
    ================================ */
-
-fn extract_citations(response: &str) -> Vec<String> {
-    let re = Regex::new(r"\[FUR:([a-f0-9\-]{8,})\]").unwrap();
-
-    let mut ids = Vec::new();
-    for cap in re.captures_iter(response) {
-        ids.push(cap[1].to_string());
-    }
-
-    ids.sort();
-    ids.dedup();
-    ids
-}
 
 #[derive(serde::Serialize)]
 struct UsedAtom<'a> {
