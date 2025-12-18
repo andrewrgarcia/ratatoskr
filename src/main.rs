@@ -1,5 +1,7 @@
 use std::fs;
 use std::io;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -36,7 +38,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     write_file(&trace_dir, "input.yaml", &task_yaml)?;
 
     // ---- PROMPT ASSEMBLY ----
-    let prompt = assemble_prompt(&task);
+    let mut prompt = assemble_prompt(&task);
+
+    let context_chunks = resolve_context(&task, &trace_dir)?;
+    for chunk in context_chunks {
+        prompt.push_str("\n\n--- CONTEXT ---\n");
+        prompt.push_str(&chunk);
+    }
+
     write_file(&trace_dir, "prompt.txt", &prompt)?;
 
     // ---- ENGINE INVOCATION ----
@@ -57,13 +66,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
    Task
    ================================ */
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Task {
-    task_type: String,
-    prompt: String,
-    memory_scope: String,
-    engine: EngineSpec,
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct EngineSpec {
@@ -72,6 +74,28 @@ struct EngineSpec {
     name: String,
     model: String,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ContextRef {
+    path: String,
+
+    // Exactly one of these may be present
+    lines: Option<(usize, usize)>,
+    section: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Task {
+    task_type: String,
+    prompt: String,
+    memory_scope: String,
+
+    #[serde(default)]
+    context: Vec<ContextRef>,
+
+    engine: EngineSpec,
+}
+
 
 fn load_task() -> Result<Task, Box<dyn std::error::Error>> {
     let path = Path::new(TASK_FILE);
@@ -84,6 +108,28 @@ fn load_task() -> Result<Task, Box<dyn std::error::Error>> {
     Ok(serde_yaml::from_str(&contents)?)
 }
 
+
+#[derive(Debug, Serialize)]
+struct SelectionEntry {
+    source: String,
+    chunk: String,
+    rationale: String,
+}
+
+fn write_selection(
+    trace_dir: &PathBuf,
+    entries: &Vec<SelectionEntry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = trace_dir
+        .join("resolved_context")
+        .join("selection.yaml");
+
+    let yaml = serde_yaml::to_string(entries)?;
+    fs::write(path, yaml)?;
+    Ok(())
+}
+
+
 /* ================================
    Prompt assembly (deterministic)
    ================================ */
@@ -93,6 +139,103 @@ fn assemble_prompt(task: &Task) -> String {
         "TASK TYPE: {}\nMEMORY SCOPE: {}\n\n{}",
         task.task_type, task.memory_scope, task.prompt
     )
+}
+
+fn resolve_context(
+    task: &Task,
+    trace_dir: &PathBuf,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let ctx_root = trace_dir.join("resolved_context");
+    let docs_dir = ctx_root.join("documents");
+    let chunks_dir = ctx_root.join("chunks");
+
+    ensure_dir(&docs_dir)?;
+    ensure_dir(&chunks_dir)?;
+
+    let mut used_chunks = Vec::new();
+    let mut selection = Vec::new();
+
+    for ctx in &task.context {
+        let src_path = Path::new(&ctx.path);
+
+        if !src_path.exists() {
+            return Err(format!("missing context file: {}", ctx.path).into());
+        }
+
+        let filename = src_path.file_name().unwrap();
+        let dst_doc = docs_dir.join(filename);
+        fs::copy(src_path, &dst_doc)?;
+
+        // ---- LINE-BASED EXTRACTION ----
+        if let Some((start, end)) = ctx.lines {
+            let file = File::open(src_path)?;
+            let reader = BufReader::new(file);
+
+            let mut extracted = String::new();
+            for (idx, line) in reader.lines().enumerate() {
+                let line_no = idx + 1;
+                if line_no >= start && line_no <= end {
+                    extracted.push_str(&line?);
+                    extracted.push('\n');
+                }
+            }
+
+            let chunk_name = format!(
+                "{}__lines_{}_{}.txt",
+                filename.to_string_lossy(),
+                start,
+                end
+            );
+
+            let chunk_path = chunks_dir.join(&chunk_name);
+            fs::write(&chunk_path, &extracted)?;
+
+            used_chunks.push(extracted.clone());
+
+            selection.push(SelectionEntry {
+                source: ctx.path.clone(),
+                chunk: chunk_name,
+                rationale: "explicit line range".to_string(),
+            });
+        }
+
+        // ---- SECTION-BASED EXTRACTION (simple marker) ----
+        if let Some(section) = &ctx.section {
+            let contents = fs::read_to_string(src_path)?;
+            let mut capture = false;
+            let mut extracted = String::new();
+
+            for line in contents.lines() {
+                if line.contains(section) {
+                    capture = true;
+                }
+                if capture {
+                    extracted.push_str(line);
+                    extracted.push('\n');
+                }
+            }
+
+            let chunk_name = format!(
+                "{}__section_{}.txt",
+                filename.to_string_lossy(),
+                section.replace(' ', "_")
+            );
+
+            let chunk_path = chunks_dir.join(&chunk_name);
+            fs::write(&chunk_path, &extracted)?;
+
+            used_chunks.push(extracted.clone());
+
+            selection.push(SelectionEntry {
+                source: ctx.path.clone(),
+                chunk: chunk_name,
+                rationale: format!("explicit section: {}", section),
+            });
+        }
+    }
+
+    write_selection(trace_dir, &selection)?;
+    Ok(used_chunks)
 }
 
 /* ================================

@@ -1,8 +1,14 @@
 task_type: chat
-prompt: "Hello Ratatoskr"
+prompt: "Summarize inflation outlook"
 memory_scope: project
+
+context:
+  - path: notes/inflation_note.md
+    lines: [12, 45]
+  - path: codex/policy_2021.md
+    section: "Inflation Targets"
+
 engine:
   type: local
   name: ollama
   model: mistral
-
