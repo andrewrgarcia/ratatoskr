@@ -1,5 +1,5 @@
 [package]
-name = "ratatoskr"
+name = "ratatoskr-cli"
 version = "0.2.0"
 edition = "2024"
 authors = ["Andrew Garcia"]
@@ -13,3 +13,7 @@ categories = ["command-line-utilities", "development-tools"]
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9.34"
+
+[[bin]]
+name = "rat"
+path = "src/main.rs"
