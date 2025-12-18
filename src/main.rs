@@ -31,11 +31,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     ensure_dir(&trace_dir)?;
     initialize_trace_layout(&trace_dir, &trace_id)?;
 
+    // Freeze intent
     let task_yaml = serde_yaml::to_string(&task)?;
     write_file(&trace_dir, "input.yaml", &task_yaml)?;
 
-    // ---- EXECUTION (stub) ----
-    // At this stage, execution means “we intentionally mark it executed”
+    // ---- PROMPT ASSEMBLY ----
+    let prompt = assemble_prompt(&task);
+    write_file(&trace_dir, "prompt.txt", &prompt)?;
+
+    // ---- ENGINE INVOCATION ----
+    let engine = StubEngine {};
+    let response = engine.run(&prompt)?;
+
+    write_file(&trace_dir, "response.txt", &response)?;
+    write_file(&trace_dir, "engine.yaml", &engine.describe())?;
+
+    // ---- FINALIZE TRACE ----
     update_trace_status(&trace_dir, TraceStatus::Executed)?;
 
     println!("Trace executed: {}", trace_id);
@@ -43,7 +54,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /* ================================
-   Task ingestion
+   Task
    ================================ */
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -51,11 +62,11 @@ struct Task {
     task_type: String,
     prompt: String,
     memory_scope: String,
-    engine: Engine,
+    engine: EngineSpec,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Engine {
+struct EngineSpec {
     #[serde(rename = "type")]
     engine_type: String,
     name: String,
@@ -70,9 +81,42 @@ fn load_task() -> Result<Task, Box<dyn std::error::Error>> {
     }
 
     let contents = fs::read_to_string(path)?;
-    let task: Task = serde_yaml::from_str(&contents)?;
+    Ok(serde_yaml::from_str(&contents)?)
+}
 
-    Ok(task)
+/* ================================
+   Prompt assembly (deterministic)
+   ================================ */
+
+fn assemble_prompt(task: &Task) -> String {
+    format!(
+        "TASK TYPE: {}\nMEMORY SCOPE: {}\n\n{}",
+        task.task_type, task.memory_scope, task.prompt
+    )
+}
+
+/* ================================
+   Engine (minimal)
+   ================================ */
+
+trait Engine {
+    fn run(&self, prompt: &str) -> Result<String, Box<dyn std::error::Error>>;
+    fn describe(&self) -> String;
+}
+
+struct StubEngine;
+
+impl Engine for StubEngine {
+    fn run(&self, prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
+        Ok(format!(
+            "STUB ENGINE RESPONSE\n--------------------\n{}",
+            prompt
+        ))
+    }
+
+    fn describe(&self) -> String {
+        "engine: stub\nmodel: none\npurpose: lifecycle validation\n".to_string()
+    }
 }
 
 /* ================================
@@ -101,16 +145,14 @@ fn update_trace_status(
     trace_dir: &PathBuf,
     new_status: TraceStatus,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let metadata_path = trace_dir.join("metadata.yaml");
-    let contents = fs::read_to_string(&metadata_path)?;
+    let path = trace_dir.join("metadata.yaml");
+    let contents = fs::read_to_string(&path)?;
     let mut meta: TraceMetadata = serde_yaml::from_str(&contents)?;
 
     validate_transition(&meta.status, &new_status)?;
-
     meta.status = new_status;
-    let updated = serde_yaml::to_string(&meta)?;
-    fs::write(metadata_path, updated)?;
 
+    fs::write(path, serde_yaml::to_string(&meta)?)?;
     Ok(())
 }
 
@@ -135,18 +177,10 @@ fn initialize_trace_layout(
 ) -> Result<(), Box<dyn std::error::Error>> {
     ensure_dir(&trace_dir.join("resolved_context"))?;
 
-    write_file(trace_dir, "prompt.txt", "# assembled prompt (placeholder)\n")?;
-    write_file(trace_dir, "response.txt", "# model response (placeholder)\n")?;
-    write_file(
-        trace_dir,
-        "memory_delta.yaml",
-        "# append-only memory changes (placeholder)\n",
-    )?;
-    write_file(
-        trace_dir,
-        "engine.yaml",
-        "# engine declaration (placeholder)\n",
-    )?;
+    write_file(trace_dir, "prompt.txt", "# placeholder\n")?;
+    write_file(trace_dir, "response.txt", "# placeholder\n")?;
+    write_file(trace_dir, "memory_delta.yaml", "# placeholder\n")?;
+    write_file(trace_dir, "engine.yaml", "# placeholder\n")?;
 
     let meta = TraceMetadata {
         trace_id: trace_id.to_string(),
@@ -155,9 +189,7 @@ fn initialize_trace_layout(
         status: TraceStatus::Initialized,
     };
 
-    let yaml = serde_yaml::to_string(&meta)?;
-    write_file(trace_dir, "metadata.yaml", &yaml)?;
-
+    write_file(trace_dir, "metadata.yaml", &serde_yaml::to_string(&meta)?)?;
     Ok(())
 }
 
