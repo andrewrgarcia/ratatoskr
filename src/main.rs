@@ -17,6 +17,8 @@ use crate::trace::{
     TraceStatus,
 };
 use crate::fur_atom::{load_fur_thread, FurAtom};
+use regex::Regex;
+use std::collections::HashSet;
 
 fn main() {
     if let Err(e) = run() {
@@ -114,6 +116,44 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     write_file(&trace_dir, "engine.yaml", &engine.describe())?;
 
     // ----------------------------
+    // POST-INFERENCE VALIDATION
+    // ----------------------------
+    let cited = extract_citations(&response);
+
+    if cited.is_empty() {
+        return Err("model produced no material citations".into());
+    }
+
+    let known: HashSet<&str> =
+        atoms.iter().map(|a| a.message_id.as_str()).collect();
+
+    for cid in &cited {
+        if !known.contains(cid.as_str()) {
+            return Err(format!("invalid citation: {}", cid).into());
+        }
+    }
+
+    // ----------------------------
+    // MATERIAL USAGE LEDGER
+    // ----------------------------
+    let used: Vec<UsedAtom> = atoms
+        .iter()
+        .filter(|a| cited.contains(&a.message_id))
+        .map(|a| UsedAtom {
+            convo_id: &a.convo_id,
+            message_id: &a.message_id,
+            sha256: &a.sha256,
+            order: a.order,
+        })
+        .collect();
+
+    write_file(
+        &trace_dir,
+        "usage.yaml",
+        &serde_yaml::to_string(&used)?,
+    )?;
+
+    // ----------------------------
     // FINALIZE TRACE
     // ----------------------------
     update_trace_status(&trace_dir, TraceStatus::Executed)?;
@@ -133,4 +173,29 @@ fn assemble_prompt(task: &Task) -> String {
         task.memory_scope,
         task.prompt
     )
+}
+
+/* ================================
+   Citation extraction & validation
+   ================================ */
+
+fn extract_citations(response: &str) -> Vec<String> {
+    let re = Regex::new(r"\[FUR:([a-f0-9\-]{8,})\]").unwrap();
+
+    let mut ids = Vec::new();
+    for cap in re.captures_iter(response) {
+        ids.push(cap[1].to_string());
+    }
+
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+#[derive(serde::Serialize)]
+struct UsedAtom<'a> {
+    convo_id: &'a str,
+    message_id: &'a str,
+    sha256: &'a str,
+    order: usize,
 }
