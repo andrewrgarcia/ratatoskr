@@ -46,6 +46,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         prompt.push_str(&chunk);
     }
 
+    write_memory_refs(&trace_dir, &task.memory_refs)?;
+
     write_file(&trace_dir, "prompt.txt", &prompt)?;
 
     // ---- ENGINE INVOCATION ----
@@ -94,6 +96,15 @@ struct Task {
     context: Vec<ContextRef>,
 
     engine: EngineSpec,
+
+    #[serde(default)]
+    memory_refs: Vec<MemoryRef>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct MemoryRef {
+    system: String,
+    id: String,
 }
 
 
@@ -236,6 +247,16 @@ fn resolve_context(
 
     write_selection(trace_dir, &selection)?;
     Ok(used_chunks)
+}
+
+fn write_memory_refs(trace_dir: &PathBuf, refs: &Vec<MemoryRef>) -> Result<(), Box<dyn std::error::Error>> {
+    let path = trace_dir
+        .join("resolved_context")
+        .join("memory_refs.yaml");
+
+    let yaml = serde_yaml::to_string(refs)?;
+    fs::write(path, yaml)?;
+    Ok(())
 }
 
 /* ================================
