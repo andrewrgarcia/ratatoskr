@@ -2,6 +2,13 @@
 name = "ratatoskr"
 version = "0.2.0"
 edition = "2024"
+authors = ["Andrew Garcia"]
+license = "Apache-2.0"
+description = "Trace-first, deterministic execution for language model workflows"
+repository = "https://github.com/andrewrgarcia/ratatoskr"
+readme = "README.md"
+keywords = ["llm", "provenance", "audit", "trace", "rag"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
