@@ -5,7 +5,7 @@
 <h1 align="center">RATATOSKR</h1>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/status-v0.3.0--enforced-blue" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/status-v0.3.0--contracted-blue" /></a>
   <a href="#"><img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue" /></a>
   <a href="#"><img src="https://img.shields.io/badge/execution-local--first-green" /></a>
   <a href="#"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" /></a>
@@ -30,7 +30,7 @@ It does **not** attempt to be intelligent.
 Instead, RATATOSKR **refuses to execute** unless *all* inputs, context, memory references,
 engine configuration, and outputs are made **explicit, persisted, and inspectable**.
 
-**If a model produces an output without explicitly citing the material it used, execution fails.**
+**If a model produces an output without producing a verifiable material usage record, execution fails.**
 
 Language models are treated as **replaceable engines**.  
 Memory and context live **outside the model**.  
@@ -40,6 +40,22 @@ RATATOSKR is infrastructure — not an assistant.
 
 ---
 
+## Execution Is Protocol-Driven
+
+RATATOSKR does not assume a single execution pattern.
+
+How context is assembled, ordered, or reused is treated as an **explicit execution protocol**,
+not an implicit behavior of the system.
+
+This allows:
+- deterministic single-shot execution
+- staged or sequential execution
+- controlled reuse of prior outputs as derived materials
+- reproducible experimentation across different execution strategies
+
+RATATOSKR enforces provenance and validation regardless of protocol.
+
+---
 ## Core Principle
 
 > **If something influenced an output, RATATOSKR requires it to be written down.**  
@@ -105,7 +121,7 @@ Other systems may consume it.
 
 ## Project Status
 
-- **v0.3.0** — Citation-enforced execution
+- **v0.3.0** — Provenance contract enforced
 - Message-level material atoms
 - Mandatory post-inference validation
 - Material usage ledger (auditable grounding)
