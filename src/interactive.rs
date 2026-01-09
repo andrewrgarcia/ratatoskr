@@ -20,12 +20,27 @@ impl InteractiveSession {
     }
 }
 
+const RATATOSKR_BANNER: &str = r#"        
+                                                            
+     ############## ===================  ##############     
+       ###########  ===================== ###########       
+           #########  =====        ======  ######           
+          ######     ======        ======   ######          
+           ########  ===================  #######           
+             ###### ==================  #######             
+                    ======  =======  ###                    
+                   ======     =======                       
+                   ======       =======                     
+                                                                                                                          
+"#;
+
 /// Entry point for interactive mode
 pub fn run_interactive(default_engine: EngineSpec) -> Result<(), Box<dyn std::error::Error>> {
     FurBridge::ensure_available()?;
 
     let mut session = InteractiveSession::new();
 
+    println!("{}", RATATOSKR_BANNER);
     println!("RATATOSKR interactive mode");
     println!("Commands: ask | attach | run | exit\n");
 
