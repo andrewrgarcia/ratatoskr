@@ -1,48 +1,35 @@
 use std::process::{Command, Stdio};
-use std::path::PathBuf;
+use std::error::Error;
 
 use crate::engine::Engine;
 
 pub struct LlamaCppEngine {
-    pub binary: PathBuf,
-    pub model: PathBuf,
+    pub binary: String,
+    pub model: String,
     pub n_predict: usize,
 }
 
 impl Engine for LlamaCppEngine {
-    fn run(&self, prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
-        if !self.binary.exists() {
-            return Err(format!(
-                "llama.cpp binary not found: {}",
-                self.binary.display()
-            ).into());
-        }
-
-        if !self.model.exists() {
-            return Err(format!(
-                "model file not found: {}",
-                self.model.display()
-            ).into());
-        }
-
-        let child = Command::new(&self.binary)
+    fn run(&self, prompt: &str) -> Result<String, Box<dyn Error>> {
+        let output = Command::new(&self.binary)
             .arg("-m")
             .arg(&self.model)
-            .arg("--n-predict")
-            .arg(self.n_predict.to_string())
-            .arg("--prompt")
+            .arg("--prompt")           // ✅ or just -p
             .arg(prompt)
+            .arg("-n")
+            .arg(self.n_predict.to_string())
+            .arg("--temp")
+            .arg("0.7")
+            .arg("-b")                 // ✅ batch mode
+            .arg("512")
+            .stdin(Stdio::null())      // ✅ close stdin
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-
-        let output = child.wait_with_output()?;
+            .stderr(Stdio::null())     // ✅ discard stderr noise
+            .output()?;
 
         if !output.status.success() {
-            return Err(format!(
-                "llama.cpp execution failed:\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            ).into());
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("llama.cpp failed:\n{}", err).into());
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -50,10 +37,8 @@ impl Engine for LlamaCppEngine {
 
     fn describe(&self) -> String {
         format!(
-            "engine: llama.cpp\nbinary: {}\nmodel: {}\nn_predict: {}\n",
-            self.binary.display(),
-            self.model.display(),
-            self.n_predict
+            "engine: llama.cpp\nmodel: {}\nn_predict: {}\n",
+            self.model, self.n_predict
         )
     }
 }
