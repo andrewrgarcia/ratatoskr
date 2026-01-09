@@ -1,5 +1,6 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/fea23bc0-30c5-4946-a054-00dfc29385eb" width="200" alt="ratatoskr logo"/>
+  <img width="200" alt="rat logo" src="https://github.com/user-attachments/assets/9ab21bcd-2af3-4f56-b93d-f62625daedc9" />
+
 </p>
 
 <h1 align="center">RATATOSKR</h1>
