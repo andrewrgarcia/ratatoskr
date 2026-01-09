@@ -3,6 +3,7 @@ mod engine_llamacpp;
 mod task;
 mod trace;
 mod fur_atom;
+mod fur_logger;
 mod citation;
 mod validate;
 mod execute;
@@ -36,7 +37,8 @@ fn entrypoint() -> Result<(), Box<dyn std::error::Error>> {
     // ---------------------------------
     if args.len() == 2 && args[1] == "run" {
         let task = load_task()?;
-        return execute_task(task);
+        execute_task(task)?;
+        return Ok(());
     }
 
     Err("usage: rat [run]".into())

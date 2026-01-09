@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::task::{Task, MemoryRef};
 use crate::engine::EngineSpec;
+use crate::fur_logger::{log_text, log_markdown};
 
 /// Interactive session state
 pub struct InteractiveSession {
@@ -41,7 +42,9 @@ pub fn run_interactive(default_engine: EngineSpec) -> Result<(), Box<dyn std::er
             "attach" => handle_attach(&mut session)?,
             "run" => {
                 let task = lower_to_task(&mut session, &default_engine)?;
-                crate::execute_task(task)?;
+                let response_path = crate::execute_task(task)?;
+                let id = log_markdown(&response_path)?;
+                println!("✔ response logged (FUR:{})", id);
             }
             "exit" | "quit" => break,
             "" => continue,
@@ -64,8 +67,9 @@ fn handle_ask(session: &mut InteractiveSession) -> Result<(), Box<dyn std::error
         return Ok(());
     }
 
+    let id = log_text(&text)?;
     session.pending_ask = Some(text);
-    println!("✔ ask recorded");
+    println!("✔ ask recorded (FUR:{})", id);
 
     Ok(())
 }
@@ -96,7 +100,9 @@ fn handle_attach(session: &mut InteractiveSession) -> Result<(), Box<dyn std::er
             }
 
             let path = write_markdown_attachment(&buf)?;
+            let id = log_markdown(&path)?;
             session.pending_attachments.push(path);
+            println!("✔ chat attachment recorded (FUR:{})", id);
 
             println!("✔ chat attachment recorded");
         }
@@ -113,8 +119,9 @@ fn handle_attach(session: &mut InteractiveSession) -> Result<(), Box<dyn std::er
                 return Ok(());
             }
 
+            let id = log_markdown(&p)?;
             session.pending_attachments.push(p);
-            println!("✔ path attachment recorded");
+            println!("✔ path attachment recorded (FUR:{})", id);
         }
 
         _ => println!("Unknown attach mode"),

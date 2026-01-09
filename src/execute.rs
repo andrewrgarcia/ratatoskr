@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::engine::{Engine, StubEngine};
 use crate::engine_llamacpp::LlamaCppEngine;
@@ -17,7 +17,7 @@ use crate::citation::extract_fur_citations;
 use crate::validate::validate_citations;
 
 /// Execute a fully-specified task (batch or interactive)
-pub fn execute_task(task: Task) -> Result<(), Box<dyn std::error::Error>> {
+pub fn execute_task(task: Task) -> Result<PathBuf, Box<dyn std::error::Error>> {
     // ----------------------------
     // TRACE INIT
     // ----------------------------
@@ -123,11 +123,19 @@ pub fn execute_task(task: Task) -> Result<(), Box<dyn std::error::Error>> {
     if let Err(e) = validate_citations(&citations, &atoms) {
         write_file(&trace_dir, "response.txt", &response)?;
         write_file(&trace_dir, "violation.txt", &e)?;
+        
         update_trace_status(&trace_dir, TraceStatus::Failed)?;
         return Err(e.into());
     }
 
+    // Raw response (unchanged)
     write_file(&trace_dir, "response.txt", &response)?;
+
+    // Markdown response (for FUR + replay)
+    let response_md_path = trace_dir.join("response.md");
+    std::fs::write(&response_md_path, &response)?;
+
+    // Engine declaration
     write_file(&trace_dir, "engine.yaml", &engine.describe())?;
 
     // ----------------------------
@@ -156,7 +164,7 @@ pub fn execute_task(task: Task) -> Result<(), Box<dyn std::error::Error>> {
     update_trace_status(&trace_dir, TraceStatus::Executed)?;
     println!("Trace executed: {}", trace_id);
 
-    Ok(())
+    Ok(response_md_path)
 }
 
 /* ================================
