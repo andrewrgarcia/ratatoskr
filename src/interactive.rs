@@ -1,29 +1,28 @@
 use std::io::{self, Write};
-use std::path::{PathBuf};
-use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::task::{Task, MemoryRef};
+use std::path::PathBuf;
+use crate::task::{Task, ContextRef};
 use crate::engine::EngineSpec;
-use crate::fur_logger::{log_text, log_markdown};
+use crate::fur_bridge::FurBridge;
 
 /// Interactive session state
 pub struct InteractiveSession {
     pub pending_ask: Option<String>,
-    pub pending_attachments: Vec<PathBuf>,
+    pub pending_context: Vec<ContextRef>,
 }
 
 impl InteractiveSession {
     pub fn new() -> Self {
         Self {
             pending_ask: None,
-            pending_attachments: Vec::new(),
+            pending_context: Vec::new(),
         }
     }
 }
 
 /// Entry point for interactive mode
 pub fn run_interactive(default_engine: EngineSpec) -> Result<(), Box<dyn std::error::Error>> {
+    FurBridge::ensure_available()?;
+
     let mut session = InteractiveSession::new();
 
     println!("RATATOSKR interactive mode");
@@ -42,9 +41,20 @@ pub fn run_interactive(default_engine: EngineSpec) -> Result<(), Box<dyn std::er
             "attach" => handle_attach(&mut session)?,
             "run" => {
                 let task = lower_to_task(&mut session, &default_engine)?;
-                let response_path = crate::execute_task(task)?;
-                let id = log_markdown(&response_path)?;
-                println!("✔ response logged (FUR:{})", id);
+                let response_md = crate::execute_task(task)?;
+
+                // Log LLM response as secondary avatar
+                match default_engine.avatar.as_deref() {
+                    Some(avatar) => {
+                        FurBridge::jot_markdown_as(avatar, &response_md)?;
+                        println!("✔ response logged as avatar `{}`", avatar);
+                    }
+                    None => {
+                        FurBridge::jot_main_markdown(&response_md)?;
+                        println!("✔ response logged as main avatar");
+                    }
+                }
+
             }
             "exit" | "quit" => break,
             "" => continue,
@@ -60,16 +70,18 @@ fn handle_ask(session: &mut InteractiveSession) -> Result<(), Box<dyn std::error
 
     let mut line = String::new();
     io::stdin().read_line(&mut line)?;
+    let text = line.trim();
 
-    let text = line.trim().to_string();
     if text.is_empty() {
         println!("Empty prompt ignored");
         return Ok(());
     }
 
-    let id = log_text(&text)?;
-    session.pending_ask = Some(text);
-    println!("✔ ask recorded (FUR:{})", id);
+    // Log user ask as MAIN avatar
+    FurBridge::jot_main(text)?;
+
+    session.pending_ask = Some(text.to_string());
+    println!("✔ ask recorded");
 
     Ok(())
 }
@@ -87,24 +99,10 @@ fn handle_attach(session: &mut InteractiveSession) -> Result<(), Box<dyn std::er
         }
 
         "chat" => {
-            println!("Paste text. End with a single line containing `EOF`.");
+            // Delegate entirely to FUR
+            FurBridge::chat()?;
 
-            let mut buf = String::new();
-            loop {
-                let mut line = String::new();
-                io::stdin().read_line(&mut line)?;
-                if line.trim() == "EOF" {
-                    break;
-                }
-                buf.push_str(&line);
-            }
-
-            let path = write_markdown_attachment(&buf)?;
-            let id = log_markdown(&path)?;
-            session.pending_attachments.push(path);
-            println!("✔ chat attachment recorded (FUR:{})", id);
-
-            println!("✔ chat attachment recorded");
+            println!("✔ chat attached (FUR-managed)");
         }
 
         "path" => {
@@ -119,34 +117,19 @@ fn handle_attach(session: &mut InteractiveSession) -> Result<(), Box<dyn std::er
                 return Ok(());
             }
 
-            let id = log_markdown(&p)?;
-            session.pending_attachments.push(p);
-            println!("✔ path attachment recorded (FUR:{})", id);
+            session.pending_context.push(ContextRef {
+                path: p.to_string_lossy().to_string(),
+                lines: None,
+                section: None,
+            });
+
+            println!("✔ path attached as context");
         }
 
         _ => println!("Unknown attach mode"),
     }
 
     Ok(())
-}
-
-fn write_markdown_attachment(contents: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let dir = PathBuf::from("chats");
-    if !dir.exists() {
-        fs::create_dir_all(&dir)?;
-    }
-
-
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)?
-        .as_secs();
-
-    let fname = format!("CHAT-{}.md", ts);
-
-    let path = dir.join(fname);
-
-    fs::write(&path, contents)?;
-    Ok(path)
 }
 
 fn lower_to_task(
@@ -158,21 +141,12 @@ fn lower_to_task(
         .take()
         .ok_or("no ask provided")?;
 
-    let memory_refs = session
-        .pending_attachments
-        .drain(..)
-        .map(|path| MemoryRef {
-            system: "fur".into(),
-            convo_id: path.to_string_lossy().to_string(), // FUR will resolve
-        })
-        .collect();
-
     Ok(Task {
         task_type: "interactive".into(),
         prompt,
-        memory_scope: "explicit".into(),
-        context: vec![],
+        memory_scope: "fur-active-thread".into(), // future hook
+        context: session.pending_context.drain(..).collect(),
         engine: engine.clone(),
-        memory_refs,
+        memory_refs: vec![], // DO NOT inject attachments as memory
     })
 }

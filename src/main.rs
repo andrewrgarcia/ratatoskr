@@ -3,7 +3,7 @@ mod engine_llamacpp;
 mod task;
 mod trace;
 mod fur_atom;
-mod fur_logger;
+mod fur_bridge;
 mod citation;
 mod validate;
 mod execute;
@@ -51,5 +51,6 @@ fn default_engine() -> EngineSpec {
         engine_type: "llama.cpp".into(),
         name: "/home/andrew/engines/llama.cpp/llama".into(),
         model: "/home/andrew/models/capybarahermes-2.5-mistral-7b.Q4_K_M.gguf".into(),
+        avatar: None,
     }
 }
