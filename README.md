@@ -12,145 +12,107 @@
 </p>
 
 <p align="center">
-  <strong>Deterministic, trace-first execution for language model workflows.</strong><br/>
-  If it influenced an output, it must be written down.
+  <strong>Execution layer for language models that enforces explicit memory and verifiable provenance.</strong>
 </p>
 
 ---
 
-## What RATATOSKR Is
+## Overview
 
-RATATOSKR is a **local-first execution enforcer for language-model workflows**.
+RATATOSKR runs language models as pure executors. Everything else—tasks, documents, conversations, outputs—exists as frozen, inspectable material on disk.
 
-It does **not** train models.  
-It does **not** host models.  
-It does **not** retrieve knowledge to “improve answers.”  
-It does **not** attempt to be intelligent.
-
-Instead, RATATOSKR **refuses to execute** unless *all* inputs, context, memory references,
-engine configuration, and outputs are made **explicit, persisted, and inspectable**.
-
-**If a model produces an output without producing a verifiable material usage record, execution fails.**
-
-Language models are treated as **replaceable engines**.  
-Memory and context live **outside the model**.  
-Every run produces **durable artifacts** that can be replayed, audited, and explained.
-
-RATATOSKR is infrastructure — not an assistant.
+Each execution produces a complete record: what information was available, how it was assembled, what the model generated, which materials were cited. If output can't be grounded in material, execution fails.
 
 ---
 
-## Execution Is Protocol-Driven
+## Execution Model
 
-RATATOSKR does not assume a single execution pattern.
+1. **Intent frozen**  
+   Task spec (`task.yaml`) defines question, scope, engine, memory references.
 
-How context is assembled, ordered, or reused is treated as an **explicit execution protocol**,
-not an implicit behavior of the system.
+2. **Memory explicit**  
+   Conversations and documents resolve to immutable atoms (FUR messages, document excerpts).
 
-This allows:
-- deterministic single-shot execution
-- staged or sequential execution
-- controlled reuse of prior outputs as derived materials
-- reproducible experimentation across different execution strategies
+3. **Context assembled deterministically**  
+   Prompts constructed in fully specified order.
 
-RATATOSKR enforces provenance and validation regardless of protocol.
+4. **Model executes**  
+   Language model treated as opaque function: input → output.
+
+5. **Provenance enforced**  
+   Outputs cite material atoms. Invalid citations fail execution.
+
+6. **Trace finalized**  
+   Inputs, outputs, validation persisted as durable artifacts.
+
+No hidden state. If it's not on disk, it didn't happen.
 
 ---
+
 ## Core Principle
 
-> **If something influenced an output, RATATOSKR requires it to be written down.**  
-> **If something changed, RATATOSKR records it.**  
-> **If it is not visible on disk, it did not happen.**
-
-There is no hidden state.  
-There is no implicit memory.  
-There is no silent retrieval.  
-There is no background execution.
+Every answer proves where it came from. Enforced mechanically, not by convention.
 
 ---
 
-## RAG, Clarified (No Hand-Waving)
+## Local-First
 
-RATATOSKR is **RAG-adjacent by nature**.
+Built for offline and air-gapped environments.
 
-It may assemble external text (documents, excerpts, notes) to condition generation.
-However, its purpose is **not** to improve answer quality.
+* Models downloaded once, run locally
+* No network required for execution
+* No telemetry, external dependencies, background calls
 
-Its purpose is to **enforce execution semantics**.
-
-Where most RAG pipelines treat provenance as optional,
-RATATOSKR makes provenance **mandatory**.
-
-RATATOSKR does not ask:  
-> “What information should we retrieve?”
-
-It asks:  
-> “What information *actually* influenced this result — and where is the proof?”
+Suitable for research, policy analysis, regulated environments where trust and reproducibility matter.
 
 ---
 
-## What a Run Produces
+## Integration
 
-Each execution creates a **trace directory** containing:
+Works with:
 
-- the frozen task specification (`input.yaml`)
-- the fully assembled prompt (`prompt.txt`)
-- resolved context artifacts (documents + extracted chunks)
-- explicit memory references
-- engine declaration
-- raw model output
-- a material usage ledger proving which inputs were actually used
-- trace metadata and lifecycle state
+* **FUR** — durable conversation and memory logging  
+* **Yggdrasil-CLI** — project and codebase flattening  
+* **Inference engines** — local or remote, interchangeable
 
-These artifacts are append-only, durable, and replayable.
+RATATOSKR defines execution truth. Other systems produce or consume its traces.
 
 ---
 
-## Relationship to Other Tools
+## Output
 
-RATATOSKR is designed to work **in concert**, not competition, with:
+Each run creates trace directory with:
 
-- **FUR** — durable AI conversation memory
-- **Yggdrasil-CLI** — project and codebase flattening
-- downstream engines (local or remote) treated as pure executors
+* frozen task specification
+* resolved memory and context artifacts
+* assembled prompt
+* engine declaration
+* raw model output
+* material usage ledger
+* execution metadata and status
 
-RATATOSKR defines *execution truth*.  
-Other systems may consume it.
-
----
-
-## Project Status
-
-- **v0.3.0** — Provenance contract enforced
-- Message-level material atoms
-- Mandatory post-inference validation
-- Material usage ledger (auditable grounding)
-- Engine abstraction intentionally minimal
-
-Future versions will extend capability **without breaking the execution contract**.
+Traces are append-only, inspectable, replayable.
 
 ---
 
-## Non-Goals
+## Direction
 
-RATATOSKR intentionally does **not**:
+Moving toward complete local-first execution stack where humans curate knowledge explicitly, models stay frozen and replaceable, reasoning is reproducible, accountability non-optional.
 
-- optimize for scale or throughput
-- provide SaaS or hosted inference
-- perform federated or decentralized compute
-- hide complexity behind convenience
-- infer intent or “help” beyond what is specified
-
-Any feature that violates these constraints requires a new scope.
+Future work expands execution patterns and engines without weakening the contract.
 
 ---
 
-## License
+## Status
 
-Licensed under the Apache License, Version 2.0.
+* **v0.3.0** — provenance contract enforced
+* Message-level material atoms
+* Mandatory citation validation
+* Deterministic prompt assembly
+* Minimal, explicit engine interface
 
 ---
 
 <p align="center">
-  <strong>RATATOSKR is the paper trail your language model cannot escape.</strong>
+  <strong>The execution record your model cannot escape.</strong>
 </p>
